@@ -2,7 +2,7 @@
 
 ACE-Step 1.5 기반 로컬 AI 노래 생성 플랫폼 (Suno 스타일).
 
-> 진행 상황: **1단계** ACE-Step API 테스트 ✅ / **2단계** FastAPI + RQ 생성 파이프라인 ✅ / **3단계** Next.js 프론트엔드 ✅ / 4단계 docker-compose
+> 진행 상황: **1단계** ACE-Step API 테스트 ✅ / **2단계** FastAPI + RQ 생성 파이프라인 ✅ / **3단계** Next.js 프론트엔드 ✅ / **4단계** docker-compose 🚧 (진행 중: acestep 이미지 빌드 미검증)
 
 ## 구조
 
@@ -64,7 +64,39 @@ cp .env.example .env
 모델 가중치는 첫 생성 요청 때 자동 다운로드됩니다 (`ACE-Step-1.5/checkpoints`, 수 GB).
 LM이 클수록 간단 모드가 설명을 더 잘 따릅니다.
 
-## 실행
+## 실행 A: Docker (권장 — 한 번에 실행)
+
+필요: Docker Engine + compose + NVIDIA Container Toolkit.
+
+- **Windows 11 / 지원되는 Windows 10**: Docker Desktop(WSL2 백엔드) 설치
+- **Docker Desktop 설치가 안 되는 Windows 10 (지원 종료)**: WSL2 Ubuntu에 Docker Engine 직접 설치
+  ```bash
+  # PowerShell에서 (Ubuntu 기본 사용자가 root가 아니면 sudo 비밀번호 입력)
+  wsl -d Ubuntu -- sudo bash /mnt/e/custommusic/scripts/install_docker_wsl.sh
+  ```
+- **Linux**: Docker Engine + `nvidia-container-toolkit`
+
+GPU 확인: `docker run --rm --gpus all nvidia/cuda:12.8.0-base-ubuntu24.04 nvidia-smi`
+
+```bash
+# 저장소 루트에서 (WSL이면: cd /mnt/e/custommusic)
+docker compose up -d --build     # 처음 빌드는 PyTorch 다운로드로 오래 걸림
+docker compose ps                # 상태 확인
+docker compose logs -f worker    # 로그
+docker compose down              # 종료
+```
+
+브라우저에서 **http://localhost:3000** 접속. mp3와 DB는 호스트의 `./storage`, 모델은 `./ACE-Step-1.5/checkpoints`를 그대로 사용합니다.
+
+| 서비스 | 내용 | 포트 |
+|--------|------|------|
+| acestep-api | ACE-Step 1.5 REST API (GPU) | 127.0.0.1:8001 |
+| redis | 작업 큐 | (내부) |
+| backend | FastAPI | 127.0.0.1:8000 |
+| worker | RQ 워커 1개 | - |
+| frontend | Next.js | 3000 |
+
+## 실행 B: 직접 실행 (Docker 없이)
 
 터미널 5개(Git Bash)에서 각각:
 

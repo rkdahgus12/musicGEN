@@ -1,0 +1,11 @@
+.git
+.venv
+.cache
+checkpoints
+gradio_outputs
+output
+**/__pycache__
+*.safetensors
+*.bin
+*.ckpt
+*.pt

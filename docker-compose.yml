@@ -1,0 +1,89 @@
+# musicGEN 전체 서비스: acestep-api, redis, backend, worker, frontend
+#   docker compose up -d --build   →  http://localhost:3000
+# 사전 준비: ACE-Step-1.5 clone, .env 작성 (README 참고). NVIDIA Container Toolkit 필요.
+
+x-backend: &backend
+  build: ./backend
+  image: musicgen-backend
+  environment:
+    REDIS_URL: redis://redis:6379/0
+    ACESTEP_URL: http://acestep-api:8001
+    STORAGE_DIR: /app/storage
+    DB_PATH: /app/storage/musicgen.db
+    BLOCKLIST_PATH: /app/config/blocklist.txt
+    MAX_DURATION: ${MAX_DURATION:-480}
+    JOB_TIMEOUT: ${JOB_TIMEOUT:-1800}
+    ACESTEP_API_KEY: ${ACESTEP_API_KEY:-}
+  volumes:
+    - ./storage:/app/storage
+    - ./config:/app/config:ro
+  restart: unless-stopped
+
+services:
+  acestep-api:
+    build:
+      context: ./ACE-Step-1.5
+      dockerfile: ../docker/acestep.Dockerfile
+    image: musicgen-acestep
+    env_file: .env
+    environment:
+      ACESTEP_API_HOST: 0.0.0.0
+      ACESTEP_API_PORT: 8001
+    volumes:
+      - ./ACE-Step-1.5/checkpoints:/app/checkpoints
+    ports:
+      - "127.0.0.1:8001:8001"
+    shm_size: 2gb
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    <<: *backend
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  worker:
+    <<: *backend
+    command: ["python", "-u", "worker.py"]
+    # GPU 1장 → 워커는 반드시 1개 (scale 금지)
+    depends_on:
+      redis:
+        condition: service_healthy
+      acestep-api:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        BACKEND_URL: http://backend:8000
+    image: musicgen-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  redis-data:
