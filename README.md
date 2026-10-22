@@ -45,10 +45,14 @@ git clone --depth 1 https://github.com/ACE-Step/ACE-Step-1.5.git
 (cd backend && uv sync)
 (cd frontend && npm install)
 
-# 3) Redis (Windows만)
+# 3) 모델 가중치 미리 받기 (권장, 약 10GB). 안 받으면 첫 생성 때 자동으로 받지만 매우 느릴 수 있음
+bash scripts/download_models.sh
+bash scripts/download_models.sh acestep-5Hz-lm-0.6B   # .env에서 0.6B LM을 쓸 때
+
+# 4) Redis (Windows만)
 bash scripts/setup_redis_windows.sh
 
-# 4) 설정 — GPU VRAM에 맞게 모델 조합 수정
+# 5) 설정 — GPU VRAM에 맞게 모델 조합 수정
 cp .env.example .env
 ```
 
@@ -92,7 +96,8 @@ GPU 확인: `docker run --rm --gpus all nvidia/cuda:12.8.0-base-ubuntu24.04 nvid
 
 ```bash
 # 저장소 루트에서 (WSL이면: cd /mnt/e/custommusic)
-docker compose up -d --build     # 처음 빌드는 PyTorch 다운로드로 오래 걸림
+docker compose up -d --build     # 처음 한 번만. acestep 이미지(약 20GB) 빌드로 오래 걸림
+docker compose up -d             # 이후 실행 (코드를 바꾼 서비스만: docker compose up -d --build backend)
 docker compose ps                # 상태 확인
 docker compose logs -f worker    # 로그
 docker compose down              # 종료
@@ -178,4 +183,7 @@ python scripts/step2_test.py      # 백엔드 전체 흐름 (금지어/검증/�
 - Windows에서는 RQ가 fork를 못 쓰므로 워커가 자동으로 `SimpleWorker`를 사용합니다. 코드를 고치면 워커를 재시작하세요.
 - 0.6B LM은 간단 모드에서 설명의 장르를 잘 안 따르거나 한국어 가사를 로마자로 쓰는 경우가 있습니다. 한국어인데 한글이 없으면 최대 3번까지 다시 생성합니다.
 - **exFAT 드라이브(외장 SSD 등)**에서는 Node의 readlink 버그로 Next.js 빌드가 실패해서 `frontend/exfat-readlink-fix.cjs`를 npm 스크립트에서 미리 불러옵니다. 다른 드라이브에서는 영향 없음.
+- 첫 생성 요청 때 ACE-Step이 모델을 병렬로 받는데 1MB/s 이하로 느려지는 경우가 있습니다. `scripts/download_models.sh`로 미리 받으면 한 파일씩 회선 속도로 받습니다 (중단 후 재실행 시 이어받기).
+- Docker Desktop이 빌드 중 자동 업데이트되면 빌드가 `error reading from server: EOF`로 끊깁니다. Settings → Software updates에서 자동 다운로드를 끄세요.
+- `nvidia-container-cli: ldcache error ... signal 9`로 acestep-api가 안 뜨면 `docker compose up -d acestep-api`로 다시 시작하세요 (일시적).
 - Git Bash의 `curl -d`로 한글을 보내면 깨집니다. 테스트는 `scripts/step2_test.py`나 `/docs`를 사용하세요.
