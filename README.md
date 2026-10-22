@@ -2,7 +2,7 @@
 
 ACE-Step 1.5 기반 로컬 AI 노래 생성 플랫폼 (Suno 스타일).
 
-> 진행 상황: **1단계** ACE-Step API 테스트 ✅ / **2단계** FastAPI + RQ 생성 파이프라인 ✅ / **3단계** Next.js 프론트엔드 ✅ / **4단계** docker-compose 🚧 (진행 중: acestep 이미지 빌드 미검증)
+> 진행 상황: **1단계** ACE-Step API 테스트 ✅ / **2단계** FastAPI + RQ 생성 파이프라인 ✅ / **3단계** Next.js 프론트엔드 ✅ / **4단계** docker-compose ✅
 
 ## 구조
 
@@ -76,6 +76,18 @@ LM이 클수록 간단 모드가 설명을 더 잘 따릅니다.
   ```
 - **Linux**: Docker Engine + `nvidia-container-toolkit`
 
+WSL에서 Docker를 쓸 때는 `%USERPROFILE%\.wslconfig`를 아래처럼 설정한 뒤 `wsl --shutdown` 하세요. 설정이 없으면 터미널을 닫았을 때 WSL이 자동 종료되어 컨테이너가 멈추고, 메모리가 부족하면 모델을 로드하다 멈춥니다.
+
+```ini
+[wsl2]
+vmIdleTimeout=-1
+memory=12GB   # PC 메모리 16GB 기준
+swap=8GB
+
+[general]
+instanceIdleTimeout=-1
+```
+
 GPU 확인: `docker run --rm --gpus all nvidia/cuda:12.8.0-base-ubuntu24.04 nvidia-smi`
 
 ```bash
@@ -85,6 +97,9 @@ docker compose ps                # 상태 확인
 docker compose logs -f worker    # 로그
 docker compose down              # 종료
 ```
+
+- ACE-Step 컨테이너는 처음 뜰 때 수 분, 첫 곡은 모델 로드 때문에 몇 분 더 걸립니다. 이후 곡은 수십 초.
+- WSL에서는 `cd /mnt/e/custommusic` 후 같은 명령 실행. Windows 브라우저에서 `localhost:3000` 접속 가능.
 
 브라우저에서 **http://localhost:3000** 접속. mp3와 DB는 호스트의 `./storage`, 모델은 `./ACE-Step-1.5/checkpoints`를 그대로 사용합니다.
 
