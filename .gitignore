@@ -1,0 +1,18 @@
+# ACE-Step 소스/모델은 README 절차대로 각 PC에서 받음
+ACE-Step-1.5/
+checkpoints/
+
+# 설정/데이터
+.env
+storage/
+*.db
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Node
+node_modules/
+.next/
