@@ -1,0 +1,82 @@
+# 금지어 목록: 실존 가수 이름 / 곡 제목
+# - 한 줄에 하나. '#' 뒤는 주석
+# - 영문은 대소문자 무시 + 단어 단위로 매칭, 한글은 띄어쓰기 무시 부분 일치
+# - 파일을 수정하면 서버 재시작 없이 바로 반영됨
+
+# --- 가수 (국내) ---
+아이유
+IU
+방탄소년단
+BTS
+블랙핑크
+BLACKPINK
+뉴진스
+NewJeans
+트와이스
+TWICE
+빅뱅
+BIGBANG
+지드래곤
+G-Dragon
+에스파
+aespa
+르세라핌
+LE SSERAFIM
+아이브
+IVE
+세븐틴
+SEVENTEEN
+임영웅
+성시경
+박효신
+나얼
+이선희
+조용필
+태연
+싸이
+PSY
+
+# --- 가수 (해외) ---
+Taylor Swift
+테일러 스위프트
+Ed Sheeran
+에드 시런
+Adele
+아델
+Beyonce
+Beyoncé
+비욘세
+Billie Eilish
+빌리 아일리시
+Bruno Mars
+브루노 마스
+Ariana Grande
+아리아나 그란데
+Michael Jackson
+마이클 잭슨
+The Weeknd
+Drake
+Eminem
+에미넴
+Coldplay
+콜드플레이
+Justin Bieber
+저스틴 비버
+Lady Gaga
+레이디 가가
+Beatles
+비틀즈
+
+# --- 곡 제목 ---
+강남스타일
+Gangnam Style
+Dynamite
+좋은 날
+밤편지
+Bohemian Rhapsody
+Shape of You
+Someone Like You
+Billie Jean
+Blinding Lights
+Hype Boy
+Ditto
