@@ -12,6 +12,24 @@ VALID_KEYS = {f"{n}{a} {m}" for n in _NOTES for a in _ACCIDENTALS for m in ("maj
 VALID_LANGS = {"ko", "en", "ja", "zh", "es", "fr", "de", "it", "pt", "ru", "unknown"}
 
 
+class Advanced(BaseModel):
+    """ACE-Step 세부 파라미터. 기본값은 실험으로 고른 '균형' 설정."""
+    # LM (가사/스타일 작성 + 오디오 코드 계획)
+    lm_temperature: float = Field(0.85, ge=0.1, le=1.5)
+    lm_cfg_scale: float = Field(2.5, ge=1.0, le=5.0)
+    lm_top_p: float = Field(0.9, ge=0.5, le=1.0)
+    lm_top_k: int = Field(0, ge=0, le=200)
+    lm_repetition_penalty: float = Field(1.0, ge=1.0, le=2.0)
+    lm_negative_prompt: str = Field("NO USER INPUT", max_length=300)
+    thinking: bool = True  # LM이 오디오 코드를 먼저 계획 (품질↑, 느림)
+    enhance_style: bool = False  # 커스텀 모드: LM이 스타일 태그를 자세한 설명으로 보강
+    # DiT (오디오 생성)
+    inference_steps: int = Field(8, ge=1, le=20)  # turbo 권장 8
+    shift: float = Field(3.0, ge=1.0, le=5.0)  # turbo 권장 3.0
+    infer_method: Literal["ode", "sde"] = "ode"
+    seed: Optional[int] = Field(None, ge=0, le=2**32 - 1)  # None이면 랜덤
+
+
 class SongCreate(BaseModel):
     mode: Literal["simple", "custom"]
     # 간단 모드
@@ -27,8 +45,11 @@ class SongCreate(BaseModel):
     key_scale: Optional[str] = None
     time_signature: Optional[Literal["2", "3", "4", "6"]] = None
     vocal_language: Optional[str] = None  # None이면 입력 텍스트로 자동 감지
+    # 간단 모드: LM에 보낼 영어 설명 직접 지정 (비우면 자동 변환)
+    lm_query: str = Field("", max_length=500)
+    advanced: Advanced = Field(default_factory=Advanced)
 
-    @field_validator("description", "title", "style", "lyrics")
+    @field_validator("description", "title", "style", "lyrics", "lm_query")
     @classmethod
     def _strip(cls, v: str) -> str:
         return v.strip()
@@ -89,6 +110,10 @@ class SongOut(BaseModel):
     ai_generated: bool
     audio_url: Optional[str]
     queue_position: Optional[int] = None
+    # 다시 만들기/재현용: 요청 원본(옵션+고급 설정), 실제 LM 쿼리, 사용된 시드
+    request: dict = {}
+    lm_query: str = ""
+    seed: Optional[int] = None
     created_at: datetime
     started_at: Optional[datetime]
     finished_at: Optional[datetime]

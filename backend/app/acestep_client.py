@@ -30,10 +30,12 @@ class AceStepClient:
     def health(self) -> dict:
         return self.http.get("/health").raise_for_status().json()["data"]
 
-    def create_sample(self, query: str, vocal_language: str = "unknown", instrumental: bool = False) -> dict:
+    def create_sample(self, query: str, vocal_language: str = "unknown", instrumental: bool = False,
+                      temperature: float = 0.85) -> dict:
         """내장 LM으로 한 줄 설명 → caption/lyrics/bpm/keyscale/duration/timesignature 생성."""
         return self._post("/v1/create_sample", {
             "query": query, "vocal_language": vocal_language, "instrumental": instrumental,
+            "temperature": temperature,
         })
 
     def release_task(self, body: dict) -> str:

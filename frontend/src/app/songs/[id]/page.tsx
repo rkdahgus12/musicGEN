@@ -5,7 +5,7 @@ import { use, useEffect, useState } from "react";
 import LyricsView from "@/components/LyricsView";
 import StatusBadge from "@/components/StatusBadge";
 import WaveformPlayer from "@/components/WaveformPlayer";
-import { api, formatDuration, isPending, Song } from "@/lib/api";
+import { api, DEFAULT_ADVANCED, formatDuration, isPending, matchPreset, PRESETS, Song } from "@/lib/api";
 
 const POLL_MS = 2000;
 
@@ -99,7 +99,7 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
 
       {song.status === "succeeded" && song.audio_url && <WaveformPlayer src={song.audio_url} />}
 
-      <div className="grid gap-6 md:grid-cols-[1fr_16rem]">
+      <div className="grid gap-6 md:grid-cols-[1fr_18rem]">
         <section className="rounded-xl border border-zinc-800 p-5">
           <h2 className="mb-3 text-sm font-semibold text-zinc-400">가사</h2>
           {song.lyrics || !isPending(song) ? (
@@ -115,8 +115,27 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
           <Meta label="키" value={song.key_scale || "-"} />
           <Meta label="언어" value={song.vocal_language || "-"} />
           <Meta label="생성 시각" value={new Date(song.created_at).toLocaleString("ko-KR")} />
+          <SettingsSummary song={song} />
         </aside>
       </div>
+
+      {!isPending(song) && (
+        <div className="flex flex-wrap gap-2">
+          <Link href={`/?from=${song.id}`} className="rounded-lg border border-zinc-700 px-3 py-2 text-sm hover:border-violet-500">
+            🔁 같은 설정으로 다시 만들기
+          </Link>
+          {song.seed !== null && (
+            <Link href={`/?from=${song.id}&seed=1`} className="rounded-lg border border-zinc-700 px-3 py-2 text-sm hover:border-violet-500">
+              📌 이 시드로 조금씩 바꿔보기
+            </Link>
+          )}
+          {song.mode === "simple" && song.lyrics && (
+            <Link href={`/?from=${song.id}&as=custom`} className="rounded-lg border border-zinc-700 px-3 py-2 text-sm hover:border-violet-500">
+              ✏️ 이 가사를 고쳐서 커스텀으로
+            </Link>
+          )}
+        </div>
+      )}
 
       <div className="flex gap-4 text-sm">
         <Link href="/" className="text-violet-400 hover:underline">
@@ -130,11 +149,29 @@ export default function SongPage({ params }: { params: Promise<{ id: string }> }
   );
 }
 
-function Meta({ label, value }: { label: string; value: string }) {
+function SettingsSummary({ song }: { song: Song }) {
+  const adv = { ...DEFAULT_ADVANCED, ...(song.request.advanced ?? {}) };
+  const preset = matchPreset(adv);
+  return (
+    <div className="space-y-4 border-t border-zinc-800 pt-4">
+      {song.lm_query && <Meta label="LM에 전달된 설명" value={song.lm_query} mono />}
+      <Meta label="품질 설정" value={preset ? PRESETS[preset].label : "사용자 지정"} />
+      <Meta
+        label="세부 파라미터"
+        mono
+        value={`temp ${adv.lm_temperature} · cfg ${adv.lm_cfg_scale} · top-p ${adv.lm_top_p}${adv.lm_top_k ? ` · top-k ${adv.lm_top_k}` : ""}
+steps ${adv.inference_steps} · shift ${adv.shift} · ${adv.infer_method.toUpperCase()}${adv.thinking ? "" : " · thinking 끔"}`}
+      />
+      <Meta label="시드" value={song.seed !== null ? String(song.seed) : adv.seed !== null ? String(adv.seed) : "-"} mono />
+    </div>
+  );
+}
+
+function Meta({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div>
       <div className="text-xs text-zinc-500">{label}</div>
-      <div className="mt-0.5 break-words text-zinc-200">{value}</div>
+      <div className={`mt-0.5 whitespace-pre-line break-words text-zinc-200 ${mono ? "font-mono text-xs" : ""}`}>{value}</div>
     </div>
   );
 }

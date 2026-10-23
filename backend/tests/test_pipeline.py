@@ -78,10 +78,11 @@ class FakeAceStep:
     """create_sample은 준비된 가사를 순서대로 돌려주고, 생성 단계는 실패시켜 LM 단계만 검사."""
 
     def __init__(self, lyrics_seq):
-        self.lyrics_seq, self.queries = list(lyrics_seq), []
+        self.lyrics_seq, self.queries, self.temps = list(lyrics_seq), [], []
 
-    def create_sample(self, query, vocal_language, instrumental):
+    def create_sample(self, query, vocal_language, instrumental, temperature=0.85):
         self.queries.append(query)
+        self.temps.append(temperature)
         return {"caption": "ballad", "lyrics": self.lyrics_seq.pop(0), "bpm": 70, "duration": 30}
 
     def release_task(self, body):
@@ -99,7 +100,8 @@ def _run_simple(client, monkeypatch, lyrics_seq):
 
 def test_simple_mode_regenerates_profane_lyrics(client, monkeypatch):
     fake, song = _run_simple(client, monkeypatch, ["[verse]\n씨발 비가 와", "[verse]\n비가 내려와"])
-    assert len(fake.queries) == 2 and "욕설 없는" in fake.queries[0]
+    assert len(fake.queries) == 2 and "clean lyrics" in fake.queries[0]
+    assert fake.queries[0].startswith("Korean song, rainy day, ballad")  # 한국어 설명 → 영어 키워드
     assert song["lyrics"] == "[verse]\n비가 내려와"
 
 
@@ -108,3 +110,36 @@ def test_simple_mode_strips_lines_when_retries_exhausted(client, monkeypatch):
     fake, song = _run_simple(client, monkeypatch, [bad] * tasks.MAX_LM_TRIES)
     assert len(fake.queries) == tasks.MAX_LM_TRIES
     assert song["lyrics"] == "[verse]\n비가 와"
+
+
+def test_prompt_preview(client):
+    r = client.post("/api/prompt-preview", json={"description": "비 오는 날 이별 발라드, 피아노"})
+    assert r.json()["lm_query"] == "Korean song, rainy day, ballad, breakup, heartbreak, piano"
+    assert client.post("/api/prompt-preview", json={"description": "sad ballad"}).json()["lm_query"] == "sad ballad"
+
+
+def test_advanced_params_passed_to_acestep(client):
+    from app.db import Song, get_session
+    r = client.post("/api/songs", json={"mode": "custom", "style": "rock", "lyrics": "[verse]\nhi",
+                                        "advanced": {"inference_steps": 16, "seed": 42, "infer_method": "sde",
+                                                     "lm_temperature": 0.6, "enhance_style": True}})
+    assert r.status_code == 202
+    with get_session() as s:
+        body = tasks.build_request(s.get(Song, r.json()["job_id"]))
+    assert body["inference_steps"] == 16 and body["seed"] == 42 and body["use_random_seed"] is False
+    assert body["infer_method"] == "sde" and body["lm_temperature"] == 0.6 and body["use_cot_caption"] is True
+    assert r.json()["request"]["advanced"]["seed"] == 42
+
+
+def test_advanced_validation(client):
+    bad = {"mode": "simple", "description": "x", "advanced": {"inference_steps": 50}}
+    assert client.post("/api/songs", json=bad).status_code == 422
+
+
+def test_sane_drops_absurd_lm_values():
+    assert tasks._sane(300, 50, 200) is None and tasks._sane(34, 50, 200) is None and tasks._sane(90, 50, 200) == 90
+
+
+def test_retry_raises_temperature(client, monkeypatch):
+    fake, _ = _run_simple(client, monkeypatch, ["[verse]\nbi-ga wa"] * 3 + ["[verse]\n비가 와"])
+    assert fake.temps == [0.85, 1.0, 1.1, 1.1]

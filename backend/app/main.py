@@ -5,10 +5,13 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
+from typing import Optional
 from sqlmodel import select
 
-from .config import CORS_ORIGINS, JOB_TIMEOUT, SONGS_DIR
+from .config import CORS_ORIGINS, JOB_TIMEOUT, MAX_DURATION, SONGS_DIR
 from .db import Song, get_session, init_db
+from .prompt_en import to_lm_query
 from .queue import redis_conn, song_queue
 from .safety import find_blocked, find_profanity
 from .schemas import SongCreate, SongOut
@@ -30,11 +33,14 @@ def to_out(song: Song) -> SongOut:
     if song.status == "queued":
         ids = song_queue.job_ids
         position = ids.index(song.id) + 1 if song.id in ids else None
+    seed = str((song.metas or {}).get("seed") or "").split(",")[0].strip()
     return SongOut(
-        **song.model_dump(exclude={"request", "metas", "audio_path", "acestep_task_id"}),
+        **song.model_dump(exclude={"metas", "audio_path", "acestep_task_id"}),
         job_id=song.id,
         audio_url=f"/api/songs/{song.id}/audio" if song.audio_path else None,
         queue_position=position,
+        lm_query=(song.metas or {}).get("lm_query", ""),
+        seed=int(seed) if seed.isdigit() else None,
     )
 
 
@@ -44,7 +50,19 @@ def health():
         redis_ok = bool(redis_conn.ping())
     except Exception:
         redis_ok = False
-    return {"ok": True, "redis": redis_ok, "queued": song_queue.count}
+    return {"ok": True, "redis": redis_ok, "queued": song_queue.count, "max_duration": MAX_DURATION}
+
+
+class PromptPreviewIn(BaseModel):
+    description: str = Field(..., max_length=500)
+    vocal_language: Optional[str] = None
+
+
+@app.post("/api/prompt-preview")
+def prompt_preview(body: PromptPreviewIn):
+    """간단 모드 설명이 LM에 어떤 영어 키워드로 전달되는지 미리보기."""
+    lang = body.vocal_language or detect_language(body.description)
+    return {"lm_query": to_lm_query(body.description, lang), "vocal_language": lang}
 
 
 @app.post("/api/songs", response_model=SongOut, status_code=202)
