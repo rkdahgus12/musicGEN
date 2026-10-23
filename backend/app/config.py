@@ -22,6 +22,7 @@ STORAGE_DIR = _path(os.getenv("STORAGE_DIR", "./storage"))
 SONGS_DIR = STORAGE_DIR / "songs"
 DB_PATH = _path(os.getenv("DB_PATH", str(STORAGE_DIR / "musicgen.db")))
 BLOCKLIST_PATH = _path(os.getenv("BLOCKLIST_PATH", "./config/blocklist.txt"))
+PROFANITY_PATH = _path(os.getenv("PROFANITY_PATH", "./config/profanity.txt"))
 
 # Tier3(6-8GB) + LM 기준 최대 480초. GPU에 맞게 .env에서 조정
 MAX_DURATION = int(os.getenv("MAX_DURATION", "480"))

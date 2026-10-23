@@ -11,6 +11,7 @@ x-backend: &backend
     STORAGE_DIR: /app/storage
     DB_PATH: /app/storage/musicgen.db
     BLOCKLIST_PATH: /app/config/blocklist.txt
+    PROFANITY_PATH: /app/config/profanity.txt
     MAX_DURATION: ${MAX_DURATION:-480}
     JOB_TIMEOUT: ${JOB_TIMEOUT:-1800}
     ACESTEP_API_KEY: ${ACESTEP_API_KEY:-}

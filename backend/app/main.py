@@ -10,7 +10,7 @@ from sqlmodel import select
 from .config import CORS_ORIGINS, JOB_TIMEOUT, SONGS_DIR
 from .db import Song, get_session, init_db
 from .queue import redis_conn, song_queue
-from .safety import find_blocked
+from .safety import find_blocked, find_profanity
 from .schemas import SongCreate, SongOut
 from .tasks import detect_language, generate_song
 
@@ -53,6 +53,10 @@ def create_song(req: SongCreate):
     if blocked:
         raise HTTPException(400, detail={"code": "blocked_term", "message": "실존 가수 이름/곡 제목은 사용할 수 없습니다.",
                                          "terms": blocked})
+    profane = find_profanity(req.description, req.title, req.style, req.lyrics)
+    if profane:
+        raise HTTPException(400, detail={"code": "profanity", "message": "욕설이 포함된 내용은 사용할 수 없습니다.",
+                                         "terms": profane})
 
     if req.mode == "simple":
         title = req.description[:40]

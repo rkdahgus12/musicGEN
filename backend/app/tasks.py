@@ -9,8 +9,13 @@ from mutagen.id3 import COMM, ID3, TIT2, TPE1, TXXX, USLT, ID3NoHeaderError
 from .acestep_client import AceStepClient
 from .config import JOB_TIMEOUT, SONGS_DIR
 from .db import Song, get_session
+from .safety import find_profanity, strip_profane_lines
 
 AI_NOTE = "AI generated (ACE-Step 1.5 via musicGEN)"
+MAX_LM_TRIES = 4
+# 내장 LM에 주는 힌트 (설명 뒤에 붙임)
+CLEAN_HINT_KO = ", 욕설 없는 깨끗한 가사"
+CLEAN_HINT_EN = ", clean lyrics without profanity"
 
 
 def _now() -> datetime:
@@ -83,12 +88,21 @@ def generate_song(song_id: str) -> str:
         if song.mode == "simple":
             # 1) 내장 LM으로 가사/스타일/메타 생성
             lang = req.get("vocal_language") or detect_language(song.description)
-            for _ in range(3):
-                sample = client.create_sample(song.description, vocal_language=lang,
-                                              instrumental=req.get("instrumental", False))
+            instrumental = req.get("instrumental", False)
+            query = song.description + (CLEAN_HINT_KO if lang == "ko" else CLEAN_HINT_EN)
+            for _ in range(MAX_LM_TRIES):
+                sample = client.create_sample(query, vocal_language=lang, instrumental=instrumental)
+                lyrics = sample.get("lyrics", "")
                 # 0.6B LM이 한국어 가사를 로마자로 쓰는 경우가 있어 한글이 없으면 다시 생성
-                if lang != "ko" or req.get("instrumental") or re.search(r"[가-힣]", sample.get("lyrics", "")):
+                romanized = lang == "ko" and not instrumental and not re.search(r"[가-힣]", lyrics)
+                # 욕설이 섞이면 다시 생성
+                profane = find_profanity(lyrics, sample.get("caption", ""))
+                if not romanized and not profane:
                     break
+                print(f"[generate_song] LM 재생성 (romanized={romanized}, profanity={profane})", flush=True)
+            if find_profanity(sample.get("lyrics", "")):
+                # 재생성으로도 안 걸러지면 해당 줄 제거
+                sample["lyrics"] = strip_profane_lines(sample["lyrics"])
             # 2) 사용자가 지정한 옵션이 LM 결과보다 우선
             song = _update(
                 song_id,

@@ -17,6 +17,7 @@ ACE-Step 1.5 기반 로컬 AI 노래 생성 플랫폼 (Suno 스타일).
 | `frontend/` | Next.js + Tailwind 웹 UI (만들기 / 결과 / 내 라이브러리) |
 | `backend/` | FastAPI 앱(`app/`), RQ 워커(`worker.py`), 테스트 |
 | `config/blocklist.txt` | 금지어(실존 가수/곡 제목) 목록. 수정 즉시 반영 |
+| `config/profanity.txt` | 욕설 목록 (`!`로 시작하면 예외 단어). 수정 즉시 반영 |
 | `scripts/` | 실행/설치/테스트 스크립트 |
 | `storage/` | 생성된 mp3, 메타 json, SQLite DB (git 제외) |
 | `ACE-Step-1.5/`, `tools/` | 각 PC에서 받는 외부 코드/바이너리 (git 제외) |
@@ -165,7 +166,8 @@ python scripts/step2_test.py      # 백엔드 전체 흐름 (금지어/검증/�
 
 - **간단 모드**: ACE-Step `/v1/create_sample`(내장 LM)로 가사·스타일·메타 생성 → 사용자 옵션으로 덮어쓰기 → `/release_task`로 생성. (`sample_query`로 한 번에 보내면 LM이 사용자 BPM/키/길이를 무시하기 때문)
 - **커스텀 모드**: `/release_task`에 `thinking=true`, `use_cot_caption=false`(스타일을 LM이 바꾸지 않게)로 생성.
-- **안전장치**: 설명/제목/스타일/가사에 `config/blocklist.txt` 단어가 있으면 `400` 차단. 모든 mp3에 ID3 태그 `AI_GENERATED=true`와 "AI generated" 주석, 옆에 `*.json` 메타(`"ai_generated": true`) 저장, DB에도 `ai_generated` 기록.
+- **안전장치**: 설명/제목/스타일/가사에 `config/blocklist.txt` 단어가 있으면 `400` 차단.
+- **욕설 필터**: 입력에 `config/profanity.txt` 단어가 있으면 `400` 차단(띄어쓰기·숫자·기호를 끼워 넣어도 감지, "시발점" 같은 예외 단어는 통과). 간단 모드는 LM에 "욕설 없는 가사" 힌트를 주고, LM이 쓴 가사에 욕설이 있으면 최대 4번 다시 생성, 그래도 남으면 해당 줄을 제거. 모든 mp3에 ID3 태그 `AI_GENERATED=true`와 "AI generated" 주석, 옆에 `*.json` 메타(`"ai_generated": true`) 저장, DB에도 `ai_generated` 기록.
 - **한 번에 1곡**: 워커 1개 + ACE-Step `ACESTEP_QUEUE_WORKERS=1`.
 - **복구**: 워커 시작 시 중단된 `running` 작업은 실패 처리, 큐에서 사라진 `queued` 작업은 재등록.
 
